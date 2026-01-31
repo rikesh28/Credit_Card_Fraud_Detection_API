@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
-# Schema for single transaction prediction
-
 class TransactionInput(BaseModel):
+    """Schema for single transaction prediction"""
+    
     TransactionAmt: float = Field(..., description="Transaction amount in USD", ge=0)
     ProductCD: str = Field(..., description="Product code (W, C, H, S, R)")
     card1: int = Field(..., description="Card identifier 1")
@@ -16,10 +16,9 @@ class TransactionInput(BaseModel):
     addr2: Optional[float] = Field(None, description="Address 2")
     P_emaildomain: Optional[str] = Field(None, description="Purchaser email domain")
     R_emaildomain: Optional[str] = Field(None, description="Recipient email domain")
-
-    # Adding Config class for example schema--> Demo Purposes
-    class Config:
-        json_schema_extra = {
+    
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "TransactionAmt": 150.50,
                 "ProductCD": "W",
@@ -35,18 +34,21 @@ class TransactionInput(BaseModel):
                 "R_emaildomain": "gmail.com"
             }
         }
-
-# Schema for prediction response
+    )
 
 class PredictionResponse(BaseModel):
+    """Schema for prediction response"""
+    
     is_fraud: bool
     fraud_probability: float
     risk_level: str
     message: str
 
-# Schema for health check
-
 class HealthResponse(BaseModel):
+    """Schema for health check"""
+    
     status: str
-    model_loaded: bool
-    model_type: str
+    ml_model_loaded: bool  
+    ml_model_type: str     
+    
+    model_config = ConfigDict(protected_namespaces=())  

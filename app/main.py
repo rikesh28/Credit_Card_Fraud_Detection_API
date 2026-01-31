@@ -41,8 +41,8 @@ async def health_check():
     """Check if API is running and model is loaded"""
     return {
         "status": "healthy",
-        "model_loaded": fraud_model.model_loaded,
-        "model_type": "XGBoost (Tuned)"
+        "ml_model_loaded": fraud_model.model_loaded,  
+        "ml_model_type": "XGBoost (Production Optimized)" 
     }
 
 # Single prediction endpoint
