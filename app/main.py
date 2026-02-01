@@ -2,10 +2,8 @@ from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from app.schemas import TransactionInput, PredictionResponse, HealthResponse
 from app.model import fraud_model
-from app.utils import calculate_fraud_stats
 import pandas as pd
 from io import StringIO
-import uvicorn
 
 # Create FastAPI app
 app = FastAPI(
@@ -14,14 +12,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware (allows frontend to call API)
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8501",  # Local Streamlit
-        "https://*.streamlit.app",  # Deployed Streamlit
-        "*" 
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,8 +35,8 @@ async def health_check():
     """Check if API is running and model is loaded"""
     return {
         "status": "healthy",
-        "ml_model_loaded": fraud_model.model_loaded,  
-        "ml_model_type": "XGBoost (Production Optimized)" 
+        "ml_model_loaded": fraud_model.model_loaded,
+        "ml_model_type": "XGBoost (Production Optimized)"
     }
 
 # Single prediction endpoint
@@ -58,8 +52,10 @@ async def predict_fraud(transaction: TransactionInput):
     - message: Human-readable result
     """
     try:
-        # Convert Pydantic model to dict
-        transaction_dict = transaction.model_dump()
+        if hasattr(transaction, 'model_dump'):
+            transaction_dict = transaction.model_dump()
+        else:
+            transaction_dict = transaction.dict()
         
         # Get prediction
         result = fraud_model.predict(transaction_dict)
@@ -67,6 +63,7 @@ async def predict_fraud(transaction: TransactionInput):
         return result
         
     except Exception as e:
+        print(f"Prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 # Batch prediction endpoint
@@ -101,32 +98,8 @@ async def predict_batch(file: UploadFile = File(...)):
         }
         
     except Exception as e:
+        print(f"Batch prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Batch prediction error: {str(e)}")
-    
-@app.post("/predict/batch/stats")
-async def predict_batch_with_stats(file: UploadFile = File(...)):
-    """
-    Batch prediction with statistical summary
-    """
-    try:
-        contents = await file.read()
-        df = pd.read_csv(StringIO(contents.decode('utf-8')))
-        
-        predictions = []
-        for idx, row in df.iterrows():
-            result = fraud_model.predict(row.to_dict())
-            predictions.append(result)
-        
-        # Calculate stats
-        stats = calculate_fraud_stats(predictions)
-        
-        return {
-            "summary": stats,
-            "detailed_predictions": predictions[:100]  # Return first 100 for display
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Model info endpoint
 @app.get("/model/info")
@@ -134,7 +107,7 @@ async def model_info():
     """Get information about the loaded model"""
     return {
         "model_type": "XGBoost Classifier",
-        "version": "1.0 (Tuned)",
+        "version": "2.0 (API-Ready)",
         "features_count": len(fraud_model.feature_names) if fraud_model.feature_names else "Unknown",
         "optimal_threshold": fraud_model.optimal_threshold,
         "training_date": "2025-01-20",  
@@ -143,9 +116,11 @@ async def model_info():
             "recall": "67.32%",
             "f1_score": "21.10%",
             "roc_auc": "82.42%"
-        }
+        },
+        "note": "Optimized for real-time inference (<100ms)"
     }
 
-# Run the app (for local testing)
+# For local development
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
